@@ -224,7 +224,14 @@ test('extracts citation urls from annotation metadata fields', () => {
   });
 
   assert.deepEqual(result.sources, [
-    { url: 'https://brand.cn/article', domain: 'brand.cn', owned: true, competitor_owned: false }
+    {
+      url: 'https://brand.cn/article',
+      domain: 'brand.cn',
+      title: '品牌资料',
+      source_origin: 'web_search',
+      owned: true,
+      competitor_owned: false
+    }
   ]);
   assert.equal(result.citation_count, 1);
   assert.equal(result.owned_citation_count, 1);
@@ -259,9 +266,56 @@ test('extracts citation urls from response output content annotations', () => {
   });
 
   assert.deepEqual(result.sources, [
-    { url: 'https://brand.cn/report', domain: 'brand.cn', owned: true, competitor_owned: false }
+    {
+      url: 'https://brand.cn/report',
+      domain: 'brand.cn',
+      source_origin: 'web_search',
+      owned: true,
+      competitor_owned: false
+    }
   ]);
   assert.equal(result.owned_citation_count, 1);
+});
+
+test('marks Ark web search url citations with origin metadata', () => {
+  const result = CitationAnalysisService.extractSources({
+    responseText: '',
+    aiResponse: {
+      output: [
+        {
+          type: 'message',
+          content: [
+            {
+              type: 'output_text',
+              text: '参考品牌资料',
+              annotations: [
+                {
+                  type: 'url_citation',
+                  url_citation: {
+                    url: 'https://brand.cn/report?utm_source=ai',
+                    title: '品牌资料'
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    brand: { website: 'https://brand.cn' },
+    competitors: []
+  });
+
+  assert.deepEqual(result.sources, [
+    {
+      url: 'https://brand.cn/report',
+      domain: 'brand.cn',
+      title: '品牌资料',
+      source_origin: 'web_search',
+      owned: true,
+      competitor_owned: false
+    }
+  ]);
 });
 
 test('does not double count metadata domain fields when a citation url is present', () => {

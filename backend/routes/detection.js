@@ -556,8 +556,7 @@ router.get('/stream', authRequired, async (req, res) => {
 
     // 针对不同平台的流式策略：
     // - deepseek: 使用原生 SSE 流式接口
-    // - doubao: 使用原生 SSE（Ark 支持 stream=true）
-    // - 其他平台：使用非流式调用并模拟增量输出
+    // - doubao/其他平台：使用非流式调用并模拟增量输出，确保豆包复用联网 Responses API
 
     let fullText = '';
 
@@ -633,7 +632,7 @@ router.get('/stream', authRequired, async (req, res) => {
         res.end();
       });
 
-    } else if (platform === 'doubao') {
+    } else if (platform === 'doubao' && process.env.DOUBAO_LEGACY_STREAM === 'true') {
       // Ark Doubao 原生 SSE
       const requestData = {
         model: AIPlatformService.getModelName(platform),

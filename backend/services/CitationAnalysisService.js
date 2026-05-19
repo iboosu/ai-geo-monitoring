@@ -97,31 +97,45 @@ class CitationAnalysisService {
     return `${protocol}//${host}${pathname}${query}`;
   }
 
-  collectMetadataSources(value, sources = []) {
+  metadataForSource(value, context = {}) {
+    const metadata = {};
+    if (context.source_origin) metadata.source_origin = context.source_origin;
+    if (context.title) metadata.title = context.title;
+    if (context.source_origin === 'web_search' && typeof value?.title === 'string' && value.title.trim()) {
+      metadata.title = value.title.trim();
+    }
+    return metadata;
+  }
+
+  collectMetadataSources(value, sources = [], context = {}) {
     if (!value) return sources;
     if (typeof value === 'string') {
       const url = this.normalizeCandidateUrl(value);
-      if (url) sources.push({ url });
-      else this.extractUrlsFromText(value).forEach((item) => sources.push({ url: item }));
+      const metadata = this.metadataForSource(null, context);
+      if (url) sources.push({ url, ...metadata });
+      else this.extractUrlsFromText(value).forEach((item) => sources.push({ url: item, ...metadata }));
       return sources;
     }
     if (Array.isArray(value)) {
-      value.forEach((item) => this.collectMetadataSources(item, sources));
+      value.forEach((item) => this.collectMetadataSources(item, sources, context));
       return sources;
     }
     if (typeof value === 'object') {
+      if (value.type === 'url_citation' && value.url_citation) {
+        this.collectMetadataSources(value.url_citation, sources, { ...context, source_origin: 'web_search' });
+      }
       let hasUrlField = false;
       ['url', 'link', 'source', 'source_url', 'sourceUrl', 'reference_url', 'referenceUrl', 'display_url', 'displayUrl', 'web_url', 'webUrl', 'href'].forEach((key) => {
         if (typeof value[key] === 'string') {
           hasUrlField = hasUrlField || !!this.normalizeCandidateUrl(value[key]);
-          this.collectMetadataSources(value[key], sources);
+          this.collectMetadataSources(value[key], sources, this.metadataForSource(value, context));
         }
       });
       if (!hasUrlField) {
         ['domain', 'source_domain', 'sourceDomain', 'display_domain', 'displayDomain', 'hostname', 'host'].forEach((key) => {
           if (typeof value[key] === 'string' && !/^https?:\/\//i.test(value[key])) {
             const domain = this.normalizeDomain(value[key]);
-            if (this.isValidDomain(domain)) sources.push({ url: '', domain });
+            if (this.isValidDomain(domain)) sources.push({ url: '', domain, ...this.metadataForSource(value, context) });
           }
         });
       }
@@ -144,7 +158,7 @@ class CitationAnalysisService {
         'url_citation',
         'urlCitation'
       ].forEach((key) => {
-        if (value[key]) this.collectMetadataSources(value[key], sources);
+        if (value[key]) this.collectMetadataSources(value[key], sources, context);
       });
     }
     return sources;
@@ -170,9 +184,13 @@ class CitationAnalysisService {
         try {
           const normalizedUrl = this.normalizeUrl(url);
           const parsed = new URL(normalizedUrl);
+          const metadata = {};
+          if (source.source_origin) metadata.source_origin = source.source_origin;
+          if (source.title) metadata.title = source.title;
           return {
             url: normalizedUrl,
-            domain: this.canonicalDomain(parsed.hostname)
+            domain: this.canonicalDomain(parsed.hostname),
+            ...metadata
           };
         } catch (_) {
           return null;

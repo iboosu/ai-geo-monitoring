@@ -120,6 +120,54 @@ test('does not log raw ai platform error response payloads', async () => {
   }
 });
 
+test('calls doubao through Ark Responses API with web search enabled', async () => {
+  const originalPost = axios.post;
+  const originalApiKey = AIPlatformService.platforms.doubao.apiKey;
+  const originalApiUrl = AIPlatformService.platforms.doubao.apiUrl;
+  const originalHeaders = { ...AIPlatformService.platforms.doubao.headers };
+  const calls = [];
+
+  AIPlatformService.platforms.doubao.apiKey = 'test-doubao-key';
+  AIPlatformService.platforms.doubao.apiUrl = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+  AIPlatformService.platforms.doubao.headers.Authorization = 'Bearer test-doubao-key';
+  axios.post = async (url, data) => {
+    calls.push({ url, data });
+    return {
+      data: {
+        output: [
+          {
+            type: 'message',
+            content: [{ type: 'output_text', text: '联网回答' }]
+          }
+        ]
+      },
+      headers: {}
+    };
+  };
+
+  try {
+    const result = await AIPlatformService.queryPlatform('doubao', '今天有什么行业新闻？');
+
+    assert.equal(result.success, true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, 'https://ark.cn-beijing.volces.com/api/v3/responses');
+    assert.deepEqual(calls[0].data.tools, [{ type: 'web_search' }]);
+    assert.deepEqual(calls[0].data.input, [
+      {
+        role: 'user',
+        content: [{ type: 'input_text', text: '今天有什么行业新闻？' }]
+      }
+    ]);
+    assert.equal(calls[0].data.messages, undefined);
+    assert.equal(calls[0].data.max_output_tokens, AIPlatformService.getMaxTokens('doubao'));
+  } finally {
+    axios.post = originalPost;
+    AIPlatformService.platforms.doubao.apiKey = originalApiKey;
+    AIPlatformService.platforms.doubao.apiUrl = originalApiUrl;
+    AIPlatformService.platforms.doubao.headers = originalHeaders;
+  }
+});
+
 function restoreEnv(key, value) {
   if (value === undefined) {
     delete process.env[key];

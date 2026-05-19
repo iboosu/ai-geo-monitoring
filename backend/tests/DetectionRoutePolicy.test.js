@@ -33,3 +33,7 @@ test('legacy async detection guards empty AI responses before creating result de
   assert.ok(guardIndex > extractIndex);
   assert.ok(guardIndex < detailIndex);
 });
+
+test('legacy detection route lets doubao streaming fall back to shared platform query by default', () => {
+  assert.match(routeSource, /platform === 'doubao' && process\.env\.DOUBAO_LEGACY_STREAM === 'true'/);
+});

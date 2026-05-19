@@ -14,7 +14,7 @@ class AIPlatformService {
     this.platforms = {
       doubao: {
         name: '豆包',
-        apiUrl: process.env.DOUBAO_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+        apiUrl: process.env.DOUBAO_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/responses',
         apiKey: process.env.DOUBAO_API_KEY,
         headers: {
           'Content-Type': 'application/json',
@@ -61,22 +61,8 @@ class AIPlatformService {
       return { success: false, error: `${platformConfig.name} API密钥未配置`, platform };
     }
 
-    // Ark Doubao 推荐包含 system + user
-    const messages = (
-      platform === 'doubao'
-        ? [
-            { role: 'system', content: 'You are a helpful assistant.' },
-            { role: 'user', content: question }
-          ]
-        : [ { role: 'user', content: question } ]
-    );
-
-    const requestData = {
-      model: this.getModelName(platform),
-      messages,
-      temperature: 0.7,
-      max_tokens: this.getMaxTokens(platform)
-    };
+    const requestData = this.buildRequestData(platform, question);
+    const requestUrl = this.getApiUrl(platform);
 
     // 加强重试：处理超时/网络类错误与 429 限流
     const MAX_ATTEMPTS = 4;
@@ -92,7 +78,7 @@ class AIPlatformService {
         } else if (proxyUrl && !HttpsProxyAgent) {
           console.warn('未安装 https-proxy-agent，忽略代理设置');
         }
-        const response = await axios.post(platformConfig.apiUrl, requestData, {
+        const response = await axios.post(requestUrl, requestData, {
           headers: {
             ...platformConfig.headers,
             'Accept': 'application/json'
@@ -138,6 +124,44 @@ class AIPlatformService {
       }
     }
     return { success: false, error: lastError?.message || '未知错误', platform };
+  }
+
+  getApiUrl(platform) {
+    const platformConfig = this.platforms[platform];
+    const configuredUrl = platformConfig?.apiUrl || '';
+    if (platform !== 'doubao') return configuredUrl;
+
+    const responsesUrl = process.env.DOUBAO_RESPONSES_API_URL?.trim();
+    if (responsesUrl) return responsesUrl;
+    return configuredUrl.replace(/\/chat\/completions\/?$/i, '/responses');
+  }
+
+  buildRequestData(platform, question) {
+    if (platform === 'doubao') {
+      return {
+        model: this.getModelName(platform),
+        input: [
+          {
+            role: 'user',
+            content: [
+              { type: 'input_text', text: question }
+            ]
+          }
+        ],
+        tools: [
+          { type: 'web_search' }
+        ],
+        temperature: 0.7,
+        max_output_tokens: this.getMaxTokens(platform)
+      };
+    }
+
+    return {
+      model: this.getModelName(platform),
+      messages: [{ role: 'user', content: question }],
+      temperature: 0.7,
+      max_tokens: this.getMaxTokens(platform)
+    };
   }
 
   // 获取平台对应的模型名称
