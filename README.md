@@ -24,7 +24,7 @@ GoodieAI GEO Monitoring System 是一个面向 Generative Engine Optimization（
 - 引用来源按自有来源、竞品来源、第三方来源聚合分析
 - 用户登录、权限、会员等级与额度管理
 - 管理后台：用户、任务、会员、系统配置与运行记录管理
-- 本地 SQLite 自动初始化，生产环境支持 Supabase/Postgres
+- 本地 SQLite 自动初始化，生产环境支持外部 Postgres 数据库
 
 ## 适用场景
 
@@ -38,9 +38,9 @@ GoodieAI GEO Monitoring System 是一个面向 Generative Engine Optimization（
 
 - 前端：Next.js，目录为 `nextjs-frontend/`
 - 后端：Node.js + Express，目录为 `backend/`
-- 数据库：本地默认 SQLite；生产环境通过 `DATABASE_URL` 使用 Supabase Postgres
-- 生产部署：Vercel 托管前端，Render 托管常驻 Express 后端，Supabase 托管 Postgres 数据库
-- API 访问：前端同域请求 `/api/*`，由 Next.js rewrites 代理到 Render 后端
+- 数据库：本地默认 SQLite；生产环境可通过 `DATABASE_URL` 使用外部 Postgres
+- 部署方式：支持前后端分离部署，也可以部署到自有服务器或支持 Node.js 常驻服务的平台
+- API 访问：前端可通过 `/api/*` 代理到后端服务
 
 ## 快速开始
 
@@ -65,7 +65,7 @@ cp nextjs-frontend/.env.example nextjs-frontend/.env.local
 - `DEFAULT_ADMIN_PASSWORD`
 - 需要启用的平台 API Key，例如 `DOUBAO_API_KEY`、`DEEPSEEK_API_KEY`
 
-生产环境还应配置 `ALLOWED_ORIGINS`，并通过平台环境变量注入 `DATABASE_URL`、AI 平台密钥等敏感配置。
+生产环境还应配置 `ALLOWED_ORIGINS`，并通过环境变量注入 `DATABASE_URL`、AI 平台密钥等敏感配置。
 
 统一启动前后端：
 
@@ -98,21 +98,16 @@ npm test
 
 ## 生产部署
 
-推荐低成本上线组合：
+生产环境建议：
 
-- Vercel：部署 `nextjs-frontend/` 前端
-- Render：部署 `backend/` Express 服务
-- Supabase：提供生产 Postgres 数据库
+- 前端和后端可以分离部署，也可以由同一台服务器反向代理
+- 后端需要运行在支持常驻 Node.js 进程的环境中
+- 数据库建议使用外部 Postgres，并通过 `DATABASE_URL` 配置
+- 前端如需同域调用后端 API，可配置 `API_BASE_URL` 作为代理目标
 
-Vercel 生产环境必须配置：
+后端生产环境必须配置强随机 `JWT_SECRET`、生产域名白名单 `ALLOWED_ORIGINS`、`DATABASE_URL` 和实际使用的 AI 平台密钥。不要把真实配置文件、访问令牌、数据库连接串或 API Key 提交到仓库。
 
-```bash
-API_BASE_URL=https://<your-render-backend-domain>
-```
-
-后端生产环境必须配置强随机 `JWT_SECRET`、生产域名白名单 `ALLOWED_ORIGINS`、Supabase `DATABASE_URL` 和实际使用的 AI 平台密钥。不要把 Vercel、Render、Supabase 的真实配置文件、访问令牌、数据库连接串或 API Key 提交到仓库。
-
-更多部署细节见 [部署与运维](docs/DEPLOYMENT.md) 和 [Vercel 部署](docs/VERCEL.md)。
+更多部署细节见 [部署与运维](docs/DEPLOYMENT.md)。
 
 ## 默认账号
 
@@ -128,5 +123,4 @@ API_BASE_URL=https://<your-render-backend-domain>
 - [接口文档](docs/API.md)
 - [环境变量](docs/ENVIRONMENT.md)
 - [部署与运维](docs/DEPLOYMENT.md)
-- [Vercel 部署](docs/VERCEL.md)
 - [安全加固说明](docs/SECURITY.md)
