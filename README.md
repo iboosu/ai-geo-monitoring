@@ -1,6 +1,6 @@
 # GoodieAI GEO Monitoring System
 
-GoodieAI GEO Monitoring System 是一个面向 Generative Engine Optimization（GEO）的监测系统，用于观察品牌在 AI 搜索、AI 问答和LLM大模型回答中的曝光、提及与推荐表现。
+GoodieAI GEO Monitoring System 是一个面向 Generative Engine Optimization（GEO）的监测系统，用于观察品牌在 AI 搜索、AI 问答和大模型回答中的曝光、提及、推荐与引用来源表现。
 
 ## 系统演示
 
@@ -15,29 +15,32 @@ GoodieAI GEO Monitoring System 是一个面向 Generative Engine Optimization（
 
 ## 核心功能
 
-  - GEO 检测任务创建与记录
-  - 多平台 AI 回答结果监测
-  - 品牌提及、关键词命中与结果详情分析
-  - 用户登录、权限与会员额度管理
-  - 管理后台：用户、任务、会员、系统配置管理
-  - 本地 SQLite 数据库自动初始化
-  - 生产环境可通过 `DATABASE_URL` 使用外部 Postgres 数据库
-  - 前后端统一启动，便于本地开发
-  - （暂未集成联网模式）
+- 品牌项目创建、归档、恢复与删除
+- GEO 检测任务创建、调度与执行记录
+- 多平台 AI 回答结果监测，当前重点支持豆包、DeepSeek
+- 豆包联网搜索调用与引用来源提取
+- 品牌提及率、Share of Voice、引用率、竞品曝光分析
+- Prompt 库管理、分类、平台选择与历史结果追踪
+- 引用来源按自有来源、竞品来源、第三方来源聚合分析
+- 用户登录、权限、会员等级与额度管理
+- 管理后台：用户、任务、会员、系统配置与运行记录管理
+- 本地 SQLite 自动初始化，生产环境支持 Supabase/Postgres
+
 ## 适用场景
 
-  - 品牌在 AI 搜索结果中的可见性监测
-  - GEO / AEO / AI Search Optimization 数据分析
-  - 生成式搜索引擎中的竞品曝光研究
-  - AI 平台回答内容的长期追踪与对比
-
-
+- 品牌在 AI 搜索结果中的可见性监测
+- GEO / AEO / AI Search Optimization 数据分析
+- 生成式搜索引擎中的竞品曝光研究
+- AI 平台回答内容与引用来源的长期追踪
+- Prompt 表现、平台差异与优化机会分析
 
 ## 当前架构
 
 - 前端：Next.js，目录为 `nextjs-frontend/`
 - 后端：Node.js + Express，目录为 `backend/`
-- 数据库：本地默认使用 SQLite（`backend/database.sqlite`），生产环境可通过 `DATABASE_URL` 切换到外部 Postgres
+- 数据库：本地默认 SQLite；生产环境通过 `DATABASE_URL` 使用 Supabase Postgres
+- 生产部署：Vercel 托管前端，Render 托管常驻 Express 后端，Supabase 托管 Postgres 数据库
+- API 访问：前端同域请求 `/api/*`，由 Next.js rewrites 代理到 Render 后端
 
 ## 快速开始
 
@@ -56,7 +59,13 @@ cp backend/.env.example backend/.env
 cp nextjs-frontend/.env.example nextjs-frontend/.env.local
 ```
 
-然后编辑 `backend/.env`，至少填写 `JWT_SECRET`、`DEFAULT_ADMIN_PASSWORD` 和需要使用的 AI 平台 API Key。生产环境还应配置 `ALLOWED_ORIGINS`，并按需配置 `DATABASE_URL`。
+然后编辑 `backend/.env`，至少填写：
+
+- `JWT_SECRET`
+- `DEFAULT_ADMIN_PASSWORD`
+- 需要启用的平台 API Key，例如 `DOUBAO_API_KEY`、`DEEPSEEK_API_KEY`
+
+生产环境还应配置 `ALLOWED_ORIGINS`，并通过平台环境变量注入 `DATABASE_URL`、AI 平台密钥等敏感配置。
 
 统一启动前后端：
 
@@ -80,14 +89,38 @@ npm run build        # 构建 Next.js 前端
 npm run lint         # 检查 Next.js 前端
 ```
 
+后端测试：
+
+```bash
+cd backend
+npm test
+```
+
+## 生产部署
+
+推荐低成本上线组合：
+
+- Vercel：部署 `nextjs-frontend/` 前端
+- Render：部署 `backend/` Express 服务
+- Supabase：提供生产 Postgres 数据库
+
+Vercel 生产环境必须配置：
+
+```bash
+API_BASE_URL=https://<your-render-backend-domain>
+```
+
+后端生产环境必须配置强随机 `JWT_SECRET`、生产域名白名单 `ALLOWED_ORIGINS`、Supabase `DATABASE_URL` 和实际使用的 AI 平台密钥。不要把 Vercel、Render、Supabase 的真实配置文件、访问令牌、数据库连接串或 API Key 提交到仓库。
+
+更多部署细节见 [部署与运维](docs/DEPLOYMENT.md) 和 [Vercel 部署](docs/VERCEL.md)。
+
 ## 默认账号
 
-- 管理员：`admin`
-- 默认密码：以 `backend/.env` 中的 `DEFAULT_ADMIN_PASSWORD` 为准
-- 演示用户：`demo`
-- 演示用户默认密码：`demo-password`
+- 管理员用户名默认由 `backend/.env` 中的 `DEFAULT_ADMIN_USERNAME` 控制
+- 管理员初始密码由 `backend/.env` 中的 `DEFAULT_ADMIN_PASSWORD` 控制
+- 生产环境部署后必须立即修改默认管理员密码
 
-生产环境部署后必须立即修改默认管理员密码，并确认 `.env`、数据库文件和平台环境变量没有提交到 Git。
+不要在 README、Issue、提交记录或聊天记录中公开生产账号、密码、JWT、API Key、数据库连接串等敏感信息。
 
 ## 文档
 
@@ -95,4 +128,5 @@ npm run lint         # 检查 Next.js 前端
 - [接口文档](docs/API.md)
 - [环境变量](docs/ENVIRONMENT.md)
 - [部署与运维](docs/DEPLOYMENT.md)
+- [Vercel 部署](docs/VERCEL.md)
 - [安全加固说明](docs/SECURITY.md)
