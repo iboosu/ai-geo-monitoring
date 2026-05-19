@@ -1,10 +1,20 @@
 import axios from 'axios';
 
-const API_BASE = (
+function normalizeApiBase(value) {
+  const base = (value || '').trim().replace(/\/+$/, '');
+
+  if (!base || base === '/api') {
+    return '';
+  }
+
+  return base.endsWith('/api') ? base.slice(0, -4) : base;
+}
+
+const API_BASE = normalizeApiBase(
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  'http://localhost:3000'
-).replace(/\/$/, '');
+  ''
+);
 
 axios.defaults.baseURL = API_BASE;
 
@@ -39,7 +49,7 @@ if (!interceptorsInitialized) {
             // 30分钟内过期：记录信息
             console.info(`Token将在${Math.ceil(expiresIn / 60000)}分钟后过期`);
           }
-        } catch (e) {
+        } catch {
           // 解析token失败，忽略
         }
       }
