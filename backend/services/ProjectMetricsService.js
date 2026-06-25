@@ -1,6 +1,18 @@
 const PromptCategoryService = require('./PromptCategoryService');
 
 class ProjectMetricsService {
+  normalizeTimezoneOffset(value, fallback = 480) {
+    const parsed = Number.parseInt(value ?? fallback, 10);
+    const offset = Number.isFinite(parsed) ? parsed : fallback;
+    return Math.max(-720, Math.min(840, offset));
+  }
+
+  getTimezoneOffsetMinutes(options = {}) {
+    return this.normalizeTimezoneOffset(
+      options.timezoneOffsetMinutes ?? process.env.ANALYTICS_TIMEZONE_OFFSET_MINUTES
+    );
+  }
+
   normalizeDays(value, fallback = 30) {
     const parsed = Number.parseInt(value ?? fallback, 10);
     const days = Number.isFinite(parsed) ? parsed : fallback;
@@ -12,25 +24,28 @@ class ProjectMetricsService {
     return Number.isNaN(date.getTime()) ? new Date() : date;
   }
 
-  startOfLocalDay(value = new Date()) {
+  startOfLocalDay(value = new Date(), timezoneOffsetMinutes = this.getTimezoneOffsetMinutes()) {
     const date = this.normalizeReferenceDate(value);
-    date.setHours(0, 0, 0, 0);
-    return date;
+    const offsetMs = this.normalizeTimezoneOffset(timezoneOffsetMinutes) * 60 * 1000;
+    const dayMs = 24 * 60 * 60 * 1000;
+    return new Date(Math.floor((date.getTime() + offsetMs) / dayMs) * dayMs - offsetMs);
   }
 
   buildPeriodWindow(days = 30, options = {}) {
     const safeDays = this.normalizeDays(days);
+    const timezoneOffsetMinutes = this.getTimezoneOffsetMinutes(options);
     const periodEnd = this.normalizeReferenceDate(options.referenceDate);
-    const periodStart = this.startOfLocalDay(periodEnd);
-    periodStart.setDate(periodStart.getDate() - (safeDays - 1));
-    const changePeriodStart = this.startOfLocalDay(periodEnd);
-    changePeriodStart.setDate(changePeriodStart.getDate() - ((safeDays * 2) - 1));
+    const dayMs = 24 * 60 * 60 * 1000;
+    const referenceDay = this.startOfLocalDay(periodEnd, timezoneOffsetMinutes);
+    const periodStart = new Date(referenceDay.getTime() - ((safeDays - 1) * dayMs));
+    const changePeriodStart = new Date(referenceDay.getTime() - (((safeDays * 2) - 1) * dayMs));
 
     return {
       days: safeDays,
       periodStart,
       periodEnd,
-      changePeriodStart
+      changePeriodStart,
+      timezoneOffsetMinutes
     };
   }
 
@@ -45,9 +60,10 @@ class ProjectMetricsService {
     return Number((nums.reduce((sum, n) => sum + n, 0) / nums.length).toFixed(2));
   }
 
-  formatDateKey(date) {
+  formatDateKey(date, timezoneOffsetMinutes = this.getTimezoneOffsetMinutes()) {
     const value = date instanceof Date ? date : new Date(date || Date.now());
-    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+    const shifted = new Date(value.getTime() + this.normalizeTimezoneOffset(timezoneOffsetMinutes) * 60 * 1000);
+    return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-${String(shifted.getUTCDate()).padStart(2, '0')}`;
   }
 
   summarize(metrics) {
@@ -397,11 +413,12 @@ class ProjectMetricsService {
 	  buildTrend(metrics, days = 30, options = {}) {
     const rows = Array.isArray(metrics) ? metrics : [];
     const safeDays = this.normalizeDays(days);
-    const referenceDate = options.referenceDate ? new Date(options.referenceDate) : new Date();
+    const timezoneOffsetMinutes = this.getTimezoneOffsetMinutes(options);
+    const referenceDate = this.normalizeReferenceDate(options.referenceDate);
     const bucket = new Map();
     for (const row of rows) {
       const date = new Date(row.created_at || row.createdAt || Date.now());
-      const key = this.formatDateKey(date);
+      const key = this.formatDateKey(date, timezoneOffsetMinutes);
       const entry = bucket.get(key) || { date: key, checks: 0, mentions: 0, cited: 0, recommended: 0, shareValues: [] };
       entry.checks += 1;
       if (row.brand_mentioned) entry.mentions += 1;
@@ -412,11 +429,11 @@ class ProjectMetricsService {
     }
 
     const trend = [];
+    const referenceDay = this.startOfLocalDay(referenceDate, timezoneOffsetMinutes);
+    const dayMs = 24 * 60 * 60 * 1000;
     for (let index = safeDays - 1; index >= 0; index -= 1) {
-      const date = new Date(referenceDate);
-      date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() - index);
-      const key = this.formatDateKey(date);
+      const date = new Date(referenceDay.getTime() - index * dayMs);
+      const key = this.formatDateKey(date, timezoneOffsetMinutes);
       const item = bucket.get(key) || { date: key, checks: 0, mentions: 0, cited: 0, recommended: 0, shareValues: [] };
       trend.push({
         date: item.date,

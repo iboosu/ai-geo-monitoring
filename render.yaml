@@ -16,6 +16,8 @@ services:
         value: production
       - key: APP_VERSION
         value: 1.0.0
+      - key: ANALYTICS_TIMEZONE_OFFSET_MINUTES
+        value: "480"
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET

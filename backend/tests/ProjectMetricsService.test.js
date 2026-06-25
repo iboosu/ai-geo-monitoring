@@ -18,11 +18,20 @@ test('builds calendar aligned metric query windows', () => {
 
   assert.equal(ProjectMetricsService.formatDateKey(window.periodStart), '2026-05-11');
   assert.equal(ProjectMetricsService.formatDateKey(window.changePeriodStart), '2026-05-04');
-  assert.equal(window.periodStart.getHours(), 0);
-  assert.equal(window.periodStart.getMinutes(), 0);
-  assert.equal(window.periodStart.getSeconds(), 0);
-  assert.equal(window.periodStart.getMilliseconds(), 0);
+  assert.equal(window.periodStart.toISOString(), '2026-05-10T16:00:00.000Z');
+  assert.equal(window.changePeriodStart.toISOString(), '2026-05-03T16:00:00.000Z');
+  assert.equal(window.timezoneOffsetMinutes, 480);
   assert.equal(window.periodEnd.toISOString(), new Date('2026-05-17T15:30:00.000+08:00').toISOString());
+});
+
+test('allows analytics timezone offsets to be configured explicitly', () => {
+  const window = ProjectMetricsService.buildPeriodWindow(1, {
+    referenceDate: '2026-05-17T15:30:00.000Z',
+    timezoneOffsetMinutes: 0
+  });
+
+  assert.equal(window.periodStart.toISOString(), '2026-05-17T00:00:00.000Z');
+  assert.equal(ProjectMetricsService.formatDateKey(window.periodStart, 0), '2026-05-17');
 });
 
 test('summarizes project visibility metrics by platform and competitor', () => {

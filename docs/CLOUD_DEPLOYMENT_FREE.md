@@ -47,6 +47,9 @@
 
 `JWT_SECRET` 由 Render 自动生成。
 
+分析报表默认按中国标准时间（UTC+8）划分自然日。需要调整时，在后端环境变量中修改
+`ANALYTICS_TIMEZONE_OFFSET_MINUTES`，例如 UTC 使用 `0`。
+
 ## 第三步：验证
 
 后端：
