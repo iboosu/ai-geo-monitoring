@@ -307,7 +307,15 @@ class ProjectRunService {
       if (Array.isArray(prompts) && prompts.length && !this.hasPromptProjectPlatformOverlap(prompts, projectPlatforms)) {
         return { ok: false, status: 400, message: PLATFORM_MISMATCH_MESSAGE };
       }
-      return { ok: false, status: 400, message: '没有可运行的启用 Prompt，或监测平台暂不可用' };
+      const availablePlatforms = AIPlatformService.getAvailablePlatforms();
+      if (!Array.isArray(availablePlatforms) || availablePlatforms.length === 0) {
+        return {
+          ok: false,
+          status: 400,
+          message: '监测平台服务凭证未配置，请管理员先在“管理后台 - 平台自检”中配置豆包或 DeepSeek'
+        };
+      }
+      return { ok: false, status: 400, message: '没有可运行的启用 Prompt' };
     }
 
     const quota = await this.consumeRunQuota(runUser.id, targets.length);
@@ -396,13 +404,14 @@ class ProjectRunService {
 
       const aiResult = await AIPlatformService.queryPlatform(target.platform, prompt.question);
       if (!aiResult.success) {
-        await this.failRecord(record, SAFE_PLATFORM_FAILURE_MESSAGE);
+        const platformError = AIPlatformService.getUserFacingError(target.platform, aiResult);
+        await this.failRecord(record, platformError);
         return {
           record_id: record.id,
           prompt_id: prompt.id,
           platform: target.platform,
           status: 'failed',
-          error: SAFE_PLATFORM_FAILURE_MESSAGE
+          error: platformError
         };
       }
 

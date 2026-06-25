@@ -65,6 +65,33 @@ test('allows overriding the doubao responses model independently', () => {
   }
 });
 
+test('builds a lightweight doubao request without web search for connection tests', () => {
+  const requestData = AIPlatformService.buildRequestData('doubao', '测试连接', {
+    skipTools: true,
+    maxTokens: 16
+  });
+
+  assert.equal(requestData.tools, undefined);
+  assert.equal(requestData.max_output_tokens, 16);
+});
+
+test('returns an actionable message when a doubao model is not activated', () => {
+  const originalDoubaoResponsesModel = process.env.DOUBAO_RESPONSES_MODEL;
+  process.env.DOUBAO_RESPONSES_MODEL = 'doubao-test-model';
+
+  try {
+    const message = AIPlatformService.getUserFacingError('doubao', {
+      providerCode: 'ModelNotOpen',
+      status: 404
+    });
+    assert.match(message, /doubao-test-model/);
+    assert.match(message, /模型未开通/);
+    assert.match(message, /推理接入点 ID/);
+  } finally {
+    restoreEnv('DOUBAO_RESPONSES_MODEL', originalDoubaoResponsesModel);
+  }
+});
+
 test('reports available platforms only for supported mainland monitoring platforms', () => {
   const originalDoubaoApiKey = AIPlatformService.platforms.doubao.apiKey;
   const originalDeepseekApiKey = AIPlatformService.platforms.deepseek.apiKey;

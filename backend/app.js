@@ -6,11 +6,14 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 
 const app = express();
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // 中间件
 // CORS 配置白名单
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
+  ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:3000'];
 
 app.use(cors({
@@ -101,8 +104,95 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: process.env.APP_VERSION || '1.0.0'
   });
+});
+
+app.get('/api/health/ready', async (req, res) => {
+  try {
+    await sequelize.authenticate();
+    res.json({
+      status: 'READY',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+      version: process.env.APP_VERSION || '1.0.0'
+    });
+  } catch (error) {
+    console.error('数据库就绪检查失败:', error?.message || error);
+    res.status(503).json({
+      status: 'NOT_READY',
+      database: 'disconnected',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// 后端根路径状态页，避免直接访问 localhost:3002 时误判为服务异常
+app.get('/', (req, res) => {
+  res.type('html').send(`<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoodieAI GEO Backend</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #202124;
+      background: #f6f8fb;
+    }
+    main {
+      max-width: 720px;
+      margin: 10vh auto;
+      padding: 32px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+    }
+    p {
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+    a {
+      color: #1677ff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .status {
+      display: inline-block;
+      margin-bottom: 16px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e9f8ef;
+      color: #137333;
+      font-weight: 600;
+    }
+    code {
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #f1f5f9;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="status">Backend running</div>
+    <h1>GoodieAI GEO 后端服务已启动</h1>
+    <p>这个端口提供后端 API，不是前端页面。</p>
+    <p>前端页面：<a href="http://localhost:3001">http://localhost:3001</a></p>
+    <p>健康检查：<a href="/api/health">/api/health</a></p>
+    <p>API 前缀：<code>/api/*</code></p>
+  </main>
+</body>
+</html>`);
 });
 
 // 错误处理中间件
