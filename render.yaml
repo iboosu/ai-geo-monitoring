@@ -1,0 +1,63 @@
+services:
+  - type: web
+    name: iboosu-ai-geo-monitoring-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health/ready
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: 22.11.0
+      - key: NODE_ENV
+        value: production
+      - key: APP_VERSION
+        value: 1.0.0
+      - key: ANALYTICS_TIMEZONE_OFFSET_MINUTES
+        value: "480"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://iboosu-ai-geo-monitoring.onrender.com
+      - key: DEFAULT_ADMIN_USERNAME
+        value: admin
+      - key: DEFAULT_ADMIN_EMAIL
+        sync: false
+      - key: DEFAULT_ADMIN_PASSWORD
+        sync: false
+      - key: DEFAULT_MEMBERSHIP_LEVEL
+        value: free
+      - key: DOUBAO_API_KEY
+        sync: false
+      - key: DOUBAO_API_URL
+        value: https://ark.cn-beijing.volces.com/api/v3/responses
+      - key: DOUBAO_RESPONSES_MODEL
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_URL
+        value: https://api.deepseek.com/v1/chat/completions
+
+  - type: web
+    name: iboosu-ai-geo-monitoring
+    runtime: static
+    rootDir: nextjs-frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./out
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: 22.11.0
+      - key: STATIC_EXPORT
+        value: "true"
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://iboosu-ai-geo-monitoring-api.onrender.com
+      - key: NEXT_PUBLIC_API_URL
+        value: https://iboosu-ai-geo-monitoring-api.onrender.com
+      - key: NEXT_PUBLIC_SITE_URL
+        value: https://iboosu-ai-geo-monitoring.onrender.com

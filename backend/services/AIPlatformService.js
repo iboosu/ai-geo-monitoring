@@ -52,7 +52,7 @@ class AIPlatformService {
   }
 
   // 调用AI平台API（仅发送用户问题原文）
-  async queryPlatform(platform, question) {
+  async queryPlatform(platform, question, options = {}) {
     const platformConfig = this.platforms[platform];
     if (!platformConfig) {
       return { success: false, error: `不支持的AI平台: ${platform}`, platform };
@@ -61,7 +61,7 @@ class AIPlatformService {
       return { success: false, error: `${platformConfig.name} API密钥未配置`, platform };
     }
 
-    const requestData = this.buildRequestData(platform, question);
+    const requestData = this.buildRequestData(platform, question, options);
     const requestUrl = this.getApiUrl(platform);
 
     // 加强重试：处理超时/网络类错误与 429 限流
@@ -122,7 +122,13 @@ class AIPlatformService {
           await new Promise(r => setTimeout(r, delay));
           continue;
         }
-        return { success: false, error: summary, platform };
+        return {
+          success: false,
+          error: summary,
+          platform,
+          providerCode: providerErrorCode,
+          status
+        };
       }
     }
     return { success: false, error: lastError?.message || '未知错误', platform };
@@ -154,9 +160,9 @@ class AIPlatformService {
     return configuredUrl.replace(/\/chat\/completions\/?$/i, '/responses');
   }
 
-  buildRequestData(platform, question) {
+  buildRequestData(platform, question, options = {}) {
     if (platform === 'doubao') {
-      return {
+      const requestData = {
         model: this.getDoubaoResponsesModel(),
         input: [
           {
@@ -166,19 +172,60 @@ class AIPlatformService {
             ]
           }
         ],
-        tools: [
-          { type: 'web_search' }
-        ],
         temperature: 0.7,
-        max_output_tokens: this.getMaxTokens(platform)
+        max_output_tokens: options.maxTokens || this.getMaxTokens(platform)
       };
+      if (!options.skipTools) {
+        requestData.tools = [{ type: 'web_search' }];
+      }
+      return requestData;
     }
 
     return {
       model: this.getModelName(platform),
       messages: [{ role: 'user', content: question }],
       temperature: 0.7,
-      max_tokens: this.getMaxTokens(platform)
+      max_tokens: options.maxTokens || this.getMaxTokens(platform)
+    };
+  }
+
+  getUserFacingError(platform, result = {}) {
+    const platformName = this.platforms[platform]?.name || platform;
+    if (result.providerCode === 'ModelNotOpen') {
+      const model = platform === 'doubao' ? this.getDoubaoResponsesModel() : this.getModelName(platform);
+      return `${platformName}模型未开通：${model}。请管理员在平台控制台开通该模型，或配置已开通的模型/推理接入点 ID`;
+    }
+    if (result.status === 401 || result.status === 403) {
+      return `${platformName}服务凭证无效或无权限，请管理员检查平台配置`;
+    }
+    if (result.status === 429) {
+      return `${platformName}调用额度不足或请求过于频繁，请稍后重试`;
+    }
+    return '监测平台调用失败，请稍后重试';
+  }
+
+  async testPlatform(platform) {
+    const platformConfig = this.platforms[platform];
+    if (!platformConfig?.apiKey) {
+      return {
+        platform,
+        ok: false,
+        configured: false,
+        message: `${platformConfig?.name || platform}服务凭证未配置`
+      };
+    }
+
+    const result = await this.queryPlatform(platform, '请只回答“连接成功”。', {
+      skipTools: true,
+      maxTokens: 16
+    });
+    return {
+      platform,
+      ok: result.success,
+      configured: true,
+      providerCode: result.providerCode || '',
+      status: result.status || null,
+      message: result.success ? '连接测试成功' : this.getUserFacingError(platform, result)
     };
   }
 
@@ -237,6 +284,35 @@ class AIPlatformService {
   // 获取可用的平台列表
   getAvailablePlatforms() {
     return MAINLAND_MONITORING_PLATFORMS.filter(platform => this.platforms[platform]?.apiKey);
+  }
+
+  updatePlatformConfig(platform, updates = {}) {
+    const platformConfig = this.platforms[platform];
+    if (!platformConfig) {
+      throw new Error(`不支持的AI平台: ${platform}`);
+    }
+
+    if (typeof updates.apiKey === 'string') {
+      const apiKey = updates.apiKey.trim();
+      if (apiKey) {
+        platformConfig.apiKey = apiKey;
+        platformConfig.headers.Authorization = `Bearer ${apiKey}`;
+      }
+    }
+
+    if (typeof updates.apiUrl === 'string') {
+      const apiUrl = updates.apiUrl.trim();
+      if (apiUrl) {
+        platformConfig.apiUrl = apiUrl;
+      }
+    }
+
+    if (platform === 'doubao' && typeof updates.responsesModel === 'string') {
+      const responsesModel = updates.responsesModel.trim();
+      if (responsesModel) {
+        process.env.DOUBAO_RESPONSES_MODEL = responsesModel;
+      }
+    }
   }
 }
 

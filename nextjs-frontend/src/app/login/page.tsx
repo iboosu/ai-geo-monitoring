@@ -12,7 +12,7 @@ export default function LoginPage() {
     localStorage.setItem('agd_token', tk);
     localStorage.setItem('agd_user', JSON.stringify(user || null));
     if (user?.id) localStorage.setItem('agd_user_id', String(user.id));
-    router.push('/geo');
+    router.push(user?.role === 'admin' ? '/admin' : '/geo');
   };
 
   return <Login onLogin={handleLogin} showRegister={true} />;

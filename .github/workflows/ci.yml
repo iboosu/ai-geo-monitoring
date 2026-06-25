@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.11.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            nextjs-frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Test backend
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DB_STORAGE: ../.tmp/ci-test.sqlite
+        run: |
+          mkdir -p ../.tmp
+          npm test
+
+      - name: Install frontend dependencies
+        working-directory: nextjs-frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: nextjs-frontend
+        env:
+          STATIC_EXPORT: "true"
+          NEXT_PUBLIC_API_BASE_URL: https://example-api.invalid
+          NEXT_PUBLIC_API_URL: https://example-api.invalid
+          NEXT_PUBLIC_SITE_URL: https://example.invalid
+        run: npm run build

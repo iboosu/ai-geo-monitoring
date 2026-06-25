@@ -201,6 +201,7 @@ test('does not auto advance an archived project schedule during tick', async () 
   const originalFindSchedules = DetectionSchedule.findAll;
   const originalFindProjects = BrandProject.findAll;
   const originalFindProject = BrandProject.findByPk;
+  const originalRecoverStale = SchedulerService.recoverStalePendingRecords;
   const updates = [];
 
   DetectionSchedule.findAll = async () => [{
@@ -212,6 +213,7 @@ test('does not auto advance an archived project schedule during tick', async () 
   }];
   BrandProject.findAll = async () => [];
   BrandProject.findByPk = async () => ({ id: 2, status: 'archived' });
+  SchedulerService.recoverStalePendingRecords = async () => 0;
 
   try {
     await SchedulerService.tick();
@@ -221,6 +223,7 @@ test('does not auto advance an archived project schedule during tick', async () 
     DetectionSchedule.findAll = originalFindSchedules;
     BrandProject.findAll = originalFindProjects;
     BrandProject.findByPk = originalFindProject;
+    SchedulerService.recoverStalePendingRecords = originalRecoverStale;
   }
 });
 
